@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'screens/main_screen.dart'; // <-- Cambiamos la importación
 
 void main() {
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -15,7 +16,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
       ),
-      home: const HomeScreen(),
+      home: const MainScreen(), // <-- Apuntamos al nuevo contenedor
     );
   }
 }

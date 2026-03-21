@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import '../models/meditation_session.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/history_provider.dart';
+import '../models/mood.dart'; // <-- ¡ESTE ES EL IMPORT MÁGICO QUE FALTABA!
 
-class ProfileScreen extends StatelessWidget {
-  final List<MeditationSession> history;
-
-  const ProfileScreen({super.key, required this.history});
+class ProfileScreen extends ConsumerWidget {
+  const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Si la lista está vacía, mostramos un mensaje de aliento
+  Widget build(BuildContext context, WidgetRef ref) {
+    final history = ref.watch(historyProvider);
+
     if (history.isEmpty) {
       return const Center(
         child: Text(
@@ -18,28 +19,33 @@ class ProfileScreen extends StatelessWidget {
       );
     }
 
-    // Si hay sesiones, construimos una lista
     return ListView.builder(
-      itemCount: history.length, // ¿Cuántas veces se repite el ciclo?
+      itemCount: history.length,
       itemBuilder: (context, index) {
-        // Obtenemos la sesión específica de esta vuelta del ciclo
         final session = history[index];
-
-        // Formateamos la hora para que los minutos menores a 10 tengan un '0' adelante (ej. 14:05)
         final String minuteStr = session.dateTime.minute.toString().padLeft(
           2,
           '0',
         );
 
-        // ListTile es un widget nativo excelente para listas ordenadas
+        // Arreglamos el warning de interpolación (sin usar el símbolo + )
+        final extraText = session.mood != null
+            ? " • Feeling ${session.mood!.displayName}"
+            : "";
+
         return ListTile(
-          leading: const Icon(Icons.check_circle, color: Colors.teal, size: 40),
+          leading: Icon(
+            session.mood?.icon ?? Icons.check_circle,
+            color: session.mood?.color ?? Colors.teal,
+            size: 40,
+          ),
           title: Text(
             "${session.durationMinutes} Minutes",
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
+          // Usamos interpolación directa
           subtitle: Text(
-            "${session.dateTime.day}/${session.dateTime.month}/${session.dateTime.year} at ${session.dateTime.hour}:$minuteStr",
+            "${session.dateTime.day}/${session.dateTime.month}/${session.dateTime.year} at ${session.dateTime.hour}:$minuteStr$extraText",
           ),
         );
       },

@@ -1,140 +1,98 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
-import '../models/meditation_session.dart'; // 1. Importamos el modelo
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/timer_provider.dart';
 
-class TimerScreen extends StatefulWidget {
-  // 2. Definimos una función que recibiremos desde afuera (Callback)
-  final void Function(MeditationSession) onSessionCompleted;
-
-  const TimerScreen({super.key, required this.onSessionCompleted});
+class TimerScreen extends ConsumerWidget {
+  const TimerScreen({super.key});
 
   @override
-  State<TimerScreen> createState() => _TimerScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 1. ESCUCHAR (Read Only): Obtenemos los datos actuales (selectedMinutes, etc)
+    final timerState = ref.watch(timerProvider);
 
-class _TimerScreenState extends State<TimerScreen> {
-  int _selectedMinutes = 15;
-  late int _remainingSeconds;
-  Timer? _timer;
-  bool _isRunning = false;
+    // 2. ACCIONAR (Write Only): Obtenemos los métodos (start, stop, etc)
+    final timerController = ref.read(timerProvider.notifier);
 
-  @override
-  void initState() {
-    super.initState();
-    _remainingSeconds = _selectedMinutes * 60;
-  }
+    // Damos formato al texto localmente (pura estética visual)
+    final minutesStr = (timerState.remainingSeconds ~/ 60).toString().padLeft(
+      2,
+      '0',
+    );
+    final secondsStr = (timerState.remainingSeconds % 60).toString().padLeft(
+      2,
+      '0',
+    );
+    final formattedTime = '$minutesStr:$secondsStr';
 
-  String get _formattedTime {
-    int minutes = _remainingSeconds ~/ 60;
-    int seconds = _remainingSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
+    return Scaffold(
+      appBar: AppBar(title: const Text("Custom Meditation")),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text("Deep Breath", style: TextStyle(fontSize: 24)),
+            const SizedBox(height: 20),
 
-  void _startTimer() {
-    if (_isRunning) return;
-
-    setState(() {
-      _isRunning = true;
-    });
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        if (_remainingSeconds > 0) {
-          _remainingSeconds--;
-        } else {
-          _stopTimer();
-          _resetTimer();
-
-          // 3. ¡LA MAGIA! El temporizador llegó a 0.
-          // Creamos una nueva sesión con los minutos elegidos y la hora actual.
-          final newSession = MeditationSession(
-            _selectedMinutes,
-            DateTime.now(),
-          );
-
-          // Ejecutamos la función que nos pasó el padre a través de 'widget.'
-          widget.onSessionCompleted(newSession);
-        }
-      });
-    });
-  }
-
-  void _stopTimer() {
-    _timer?.cancel();
-    setState(() {
-      _isRunning = false;
-    });
-  }
-
-  void _resetTimer() {
-    _stopTimer();
-    setState(() {
-      _remainingSeconds = _selectedMinutes * 60;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text("Deep Breath", style: TextStyle(fontSize: 24)),
-          const SizedBox(height: 20),
-          Text(
-            _formattedTime,
-            style: const TextStyle(fontSize: 72, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40.0),
-            child: Slider(
-              value: _selectedMinutes.toDouble(),
-              min: 1,
-              max: 60,
-              divisions: 59,
-              label: "$_selectedMinutes min",
-              onChanged: _isRunning
-                  ? null
-                  : (double value) {
-                      setState(() {
-                        _selectedMinutes = value.toInt();
-                        _remainingSeconds = _selectedMinutes * 60;
-                      });
-                    },
+            Text(
+              formattedTime,
+              style: const TextStyle(fontSize: 72, fontWeight: FontWeight.bold),
             ),
-          ),
-          const SizedBox(height: 40),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: _isRunning ? _stopTimer : _startTimer,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 15,
-                  ),
-                ),
-                child: Text(_isRunning ? "Pause" : "Start"),
+
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40.0),
+              child: Slider(
+                value: timerState.selectedMinutes.toDouble(),
+                min: 1,
+                max: 60,
+                divisions: 59,
+                label: "${timerState.selectedMinutes} min",
+                // Si corre, se anula. Si no, le avisa al controlador.
+                onChanged: timerState.isRunning
+                    ? null
+                    : (value) => timerController.updateMinutes(value),
               ),
-              const SizedBox(width: 20),
-              OutlinedButton(
-                onPressed:
-                    (_isRunning || _remainingSeconds != _selectedMinutes * 60)
-                    ? _resetTimer
-                    : null,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 15,
+            ),
+
+            const SizedBox(height: 40),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton(
+                  // Decidimos qué función del controlador llamar
+                  onPressed: timerState.isRunning
+                      ? timerController.stop
+                      : timerController.start,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 15,
+                    ),
                   ),
+                  child: Text(timerState.isRunning ? "Pause" : "Start"),
                 ),
-                child: const Text("Reset"),
-              ),
-            ],
-          ),
-        ],
+
+                const SizedBox(width: 20),
+
+                OutlinedButton(
+                  onPressed:
+                      (timerState.isRunning ||
+                          timerState.remainingSeconds !=
+                              timerState.selectedMinutes * 60)
+                      ? timerController.reset
+                      : null,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 15,
+                    ),
+                  ),
+                  child: const Text("Reset"),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

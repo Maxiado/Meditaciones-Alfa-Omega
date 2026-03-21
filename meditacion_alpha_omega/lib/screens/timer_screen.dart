@@ -1,26 +1,33 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import '../models/meditation_session.dart'; // 1. Importamos el modelo
 
 class TimerScreen extends StatefulWidget {
-  const TimerScreen({super.key});
+  // 2. Definimos una función que recibiremos desde afuera (Callback)
+  final void Function(MeditationSession) onSessionCompleted;
+
+  const TimerScreen({super.key, required this.onSessionCompleted});
 
   @override
   State<TimerScreen> createState() => _TimerScreenState();
 }
 
 class _TimerScreenState extends State<TimerScreen> {
-  static const int _initialMinutes = 15;
-  int _remainingSeconds = _initialMinutes * 60;
+  int _selectedMinutes = 15;
+  late int _remainingSeconds;
   Timer? _timer;
   bool _isRunning = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _remainingSeconds = _selectedMinutes * 60;
+  }
 
   String get _formattedTime {
     int minutes = _remainingSeconds ~/ 60;
     int seconds = _remainingSeconds % 60;
-    String minutesStr = minutes.toString().padLeft(2, '0');
-    String secondsStr = seconds.toString().padLeft(2, '0');
-
-    return '$minutesStr:$secondsStr';
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   void _startTimer() {
@@ -36,47 +43,96 @@ class _TimerScreenState extends State<TimerScreen> {
           _remainingSeconds--;
         } else {
           _stopTimer();
-          print("Meditación Finalizada!");
+          _resetTimer();
+
+          // 3. ¡LA MAGIA! El temporizador llegó a 0.
+          // Creamos una nueva sesión con los minutos elegidos y la hora actual.
+          final newSession = MeditationSession(
+            _selectedMinutes,
+            DateTime.now(),
+          );
+
+          // Ejecutamos la función que nos pasó el padre a través de 'widget.'
+          widget.onSessionCompleted(newSession);
         }
       });
     });
   }
 
   void _stopTimer() {
-    // Cancelamos la ejecución del objeto Timer
     _timer?.cancel();
     setState(() {
       _isRunning = false;
     });
   }
 
-  // --- INTERFAZ VISUAL ---
+  void _resetTimer() {
+    _stopTimer();
+    setState(() {
+      _remainingSeconds = _selectedMinutes * 60;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text("Meditación", style: TextStyle(fontSize: 24)),
-          const SizedBox(height: 20), // Un espacio vacío para separar elementos
-          // Usamos nuestro método Getter para mostrar el texto formateado
+          const Text("Deep Breath", style: TextStyle(fontSize: 24)),
+          const SizedBox(height: 20),
           Text(
             _formattedTime,
             style: const TextStyle(fontSize: 72, fontWeight: FontWeight.bold),
           ),
-
-          const SizedBox(height: 40),
-
-          // Botón que cambia su comportamiento dependiendo si está corriendo o no
-          ElevatedButton(
-            // Operador ternario: Si corre, la función es stop. Si no, es start.
-            onPressed: _isRunning ? _stopTimer : _startTimer,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-              textStyle: const TextStyle(fontSize: 20),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40.0),
+            child: Slider(
+              value: _selectedMinutes.toDouble(),
+              min: 1,
+              max: 60,
+              divisions: 59,
+              label: "$_selectedMinutes min",
+              onChanged: _isRunning
+                  ? null
+                  : (double value) {
+                      setState(() {
+                        _selectedMinutes = value.toInt();
+                        _remainingSeconds = _selectedMinutes * 60;
+                      });
+                    },
             ),
-            // El texto del botón también cambia
-            child: Text(_isRunning ? "Pausar" : "Comenzar"),
+          ),
+          const SizedBox(height: 40),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(
+                onPressed: _isRunning ? _stopTimer : _startTimer,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 15,
+                  ),
+                ),
+                child: Text(_isRunning ? "Pause" : "Start"),
+              ),
+              const SizedBox(width: 20),
+              OutlinedButton(
+                onPressed:
+                    (_isRunning || _remainingSeconds != _selectedMinutes * 60)
+                    ? _resetTimer
+                    : null,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 15,
+                  ),
+                ),
+                child: const Text("Reset"),
+              ),
+            ],
           ),
         ],
       ),
